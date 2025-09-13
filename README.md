@@ -73,25 +73,27 @@ Make sure to have a look at the [architecture documentation](documentation/archi
 
 ```text
 % scan -h
-usage: scan [-h] [-i path [path ...]] [-o path] [-c path [path ...]]
-            [-t number] [-s number] [-m seconds] [-n]
+usage: scan [-h] [-o path] [-c path [path ...]] [-t number] [-s number]
+            [-m seconds] [-n]
             [-f <host> <protocol> <port> <service> 
                [<host> <protocol> <port> <service> ...]]
             [-y] [-d character] [--ignore-uid]
+            path [path ...]
 
 Schedule and execute various tools based on the findings of an Nmap service
 scan.
 
+positional arguments:
+  path                  path to the Nmap scan result file
+                        (e.g. 'nmap/services.xml')
+
 options:
   -h, --help            show this help message and exit
-  -i, --input path [path ...]
-                        path to the result file(s) of the Nmap service scan
-                        (default: 'services.xml')
-  -o, --output path     path to where the results are stored (default:
-                        './recon')
+  -o, --output path     path to where the results are stored
+                        (default: './recon')
   -c, --config path [path ...]
-                        path to the scanner configuration file(s); see
-                        '/path/to/recon/config/scanner.toml'
+                        path to the scanner configuration file(s);
+                        see '/path/to/recon/config/scanner.toml'
   -t, --concurrent-targets number
                         number of targets that should be scanned concurrently
                         (default: 3)

@@ -981,12 +981,11 @@ def main():
   )
 
   parser.add_argument(
-    '-i', '--input',
+    'input',
     metavar = 'path',
-    help = "path to the result file(s) of the Nmap service scan (default: 'services.xml')",
+    help = "path to the Nmap scan result file (e.g. 'nmap/services.xml')",
     type = pathlib.Path,
     nargs = '+',
-    default = 'services.xml'
   )
 
   parser.add_argument(
