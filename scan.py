@@ -425,8 +425,10 @@ def find_suitable_scans(transport_protocol, application_protocol):
 
   scan_definitions = []
   
-  # iterate over each service scan configuration
-  for service_name, service_config in CONFIG['services'].items():
+  # iterate over each service config
+  for service_config in CONFIG['services']:
+    service_name = service_config['name']
+
     if 'transport_protocol' in service_config:
       if not re.search(service_config['transport_protocol'], transport_protocol):
         continue
@@ -436,7 +438,9 @@ def find_suitable_scans(transport_protocol, application_protocol):
         continue
 
     # iterate over each scan of a specific service config
-    for scan_name, scan_config in service_config['scans'].items():
+    for scan_config in service_config['scans']:
+      scan_name = scan_config['name']
+
       if 'transport_protocol' in scan_config:
         if not re.search(scan_config['transport_protocol'], transport_protocol):
           continue
@@ -452,7 +456,7 @@ def find_suitable_scans(transport_protocol, application_protocol):
           service_name,
           scan_name,
           scan_config['command'],
-          True if 'run_once' in scan_config else False
+          scan_config['run_once'] if 'run_once' in scan_config else False
         )
       )
 
@@ -780,6 +784,85 @@ def parse_result_files(base_directory, result_files, scan_filters):
 
   return targets
 
+def update_scan_config(scan_config, new_scan_config):
+  log(f"updating scan '{scan_config['name']}' ...")
+
+  if 'transport_protocol' in new_scan_config:
+    log(f"updating transport protocol regex: '{new_scan_config['transport_protocol']}'")
+    scan_config['transport_protocol'] = new_scan_config['transport_protocol']
+
+  if 'application_protocol' in new_scan_config:
+    log(f"updating application protocol regex: '{new_scan_config['application_protocol']}'")
+    scan_config['application_protocol'] = new_scan_config['application_protocol']
+
+  if 'command' in new_scan_config:
+    log(f"updating command: '{new_scan_config['command']}'")
+    scan_config['command'] = new_scan_config['command']
+
+  if 'run_once' in scan_config:
+    log(f"updating run-once flag: '{new_scan_config['run_once']}'")
+    scan_config['run_once'] = new_scan_config['run_once']
+
+def update_service_config(service_config, new_service_config):
+  log(f"updating service '{service_config['name']}' ...")
+
+  if 'transport_protocol' in new_service_config:
+    log(f"updating transport protocol regex: '{new_service_config['transport_protocol']}'")
+    service_config['transport_protocol'] = new_service_config['transport_protocol']
+
+  if 'application_protocol' in new_service_config:
+    log(f"updating application protocol regex: '{new_service_config['application_protocol']}'")
+    service_config['application_protocol'] = new_service_config['application_protocol']
+
+  if 'scans' not in new_service_config:
+    return
+
+  if 'scans' not in service_config:
+    log("setting scans")
+    service_config['scans'] = new_service_config['scans']
+    return
+
+  for scan_config in new_service_config['scans']:
+    scan_name = scan_config['name']
+    log(f"scan name: '{scan_name}'")
+
+    append_config = True
+    for sc in service_config['scans']:
+      if sc['name'] == scan_name:
+        update_scan_config(sc, scan_config)
+        append_config = False
+        break
+
+    if append_config:
+      log("appending scan")
+      service_config['scans'].append(scan_config)
+
+def update_config(config, new_config):
+  if 'globals' in new_config:
+    # https://peps.python.org/pep-0584/
+    config['globals'] |= new_config['globals']
+
+  if 'services' not in new_config:
+    return
+
+  if 'services' not in config:
+    config['services'] = new_config['services']
+    return
+
+  for service_config in new_config['services']:
+    service_name = service_config['name']
+
+    append_config = True
+    for sc in config['services']:
+      if sc['name'] == service_name:
+        update_service_config(sc, service_config)
+        append_config = False
+        break
+
+    if append_config:
+      log(f"appending service '{service_name}'")
+      config['services'].append(service_config)
+
 def load_config(config_files):
   config = None
 
@@ -817,43 +900,8 @@ def load_config(config_files):
       log("overwriting config")
       config = new_config
     else:
-      log("merging config ...")
-      # https://peps.python.org/pep-0584/
-
-      if 'globals' in new_config:
-        config['globals'] |= new_config['globals']
-
-      if 'services' in new_config:
-        for service_name, service_config in new_config['services'].items():
-          if service_name not in config['services']:
-            config['services'][service_name] = service_config
-            continue
-
-          if 'transport_protocol' in service_config:
-            config['services'][service_name]['transport_protocol'] = service_config['transport_protocol']
-
-          if 'application_protocol' in service_config:
-            config['services'][service_name]['application_protocol']= service_config['application_protocol']
-
-          if 'scans' not in service_config:
-            continue
-
-          for scan_name, scan_config in service_config['scans'].items():
-            if scan_name not in config['services'][service_name]['scans']:
-              config['services'][service_name]['scans'][scan_name] = scan_config
-              continue
-
-            if 'transport_protocol' in scan_config:
-              config['services'][service_name]['scans'][scan_name]['transport_protocol'] = scan_config['transport_protocol']
-
-            if 'application_protocol' in service_config:
-              config['services'][service_name]['scans'][scan_name]['application_protocol'] = scan_config['application_protocol']
-
-            if 'command' in scan_config:
-              config['services'][service_name]['scans'][scan_name]['command'] = scan_config['command']
-
-            if 'run_once' in scan_config:
-              config['services'][service_name]['scans'][scan_name]['run_once'] = scan_config['run_once']
+      log("updating config ...")
+      update_config(config, new_config)
 
   return config
 
