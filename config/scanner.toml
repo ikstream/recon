@@ -261,7 +261,7 @@ command = 'svmap -p {port} {address} 2>&1 | tee "{result_file}.log"'
 name = 'smb'
 application_protocol = 'microsoft-ds|netbios|smb'
 
-  # SMB does not support TLS/STARTTLS; only LDAP can use TLS: https://wiki.samba.org/index.php/Configuring_LDAP_over_SSL_(LDAPS)_on_a_Samba_AD_DC
+# SMB does not support TLS/STARTTLS; only LDAP can use TLS: https://wiki.samba.org/index.php/Configuring_LDAP_over_SSL_(LDAPS)_on_a_Samba_AD_DC
 
 [[services.scans]]
 name = 'nmap'
@@ -347,7 +347,7 @@ transport_protocol = 'tcp'
 command = 'testssl --ip one --nodns min --mapping no-openssl --warnings off --connect-timeout 60 --openssl-timeout 60 --logfile "{result_file}.log" --jsonfile "{result_file}.json" $([[ "{address_type}" == "IPv6" ]] && echo "[{hostname}]" || echo "{hostname}"):{port}'
 
 [[services]]
-name = 'tls_misc'
+name = 'tls-misc'
 # services that support opportunistic TLS (e.g. STARTTLS) or use TLS in some other form
 # https://www.rfc-editor.org/info/rfc7435
 application_protocol = 'apani1|ipp|ircu?$|ftp(-data)?|imap|ldap|mongod|ms-wbt-server|mysql|nntp|oracle|pop3|radius$|postgresql|sieve|smtp|vnc|xmpp'
