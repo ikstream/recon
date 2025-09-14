@@ -253,21 +253,19 @@ class Target:
 
 class ScanDefinition:
   # as parsed from the scanner config (`scanner.toml`)
-  def __init__(self, service, name, command, patterns, run_once):
+  def __init__(self, service, name, command, run_once):
     self.service = service
     self.name = name
     self.command = command
-    self.patterns = patterns
     self.run_once = run_once
 
 class Scan:
-  def __init__(self, target, host, port, description, command, patterns):
+  def __init__(self, target, host, port, description, command):
     self.target = target
     self.host = host # address or hostname
     self.port = port
     self.description = description # [<host>, <transport protocol>/<port>, <service>, <hostname>, <name>]
     self.command = command # the command string
-    self.patterns = patterns
     self.active = False
     self.completed = False
     self.return_code = None
@@ -423,31 +421,40 @@ async def run_command(scan: Scan):
     if return_code not in ('timeout', 'cancelled'):
       log(f"[{scan_description}]\tdone")
 
-def find_suitable_scans(application_protocol):
+def find_suitable_scans(transport_protocol, application_protocol):
 
   scan_definitions = []
   
   # iterate over each service scan configuration
   for service_name, service_config in CONFIG['services'].items():
-    service_patterns = service_config['patterns'] if 'patterns' in service_config else ['.+']
+    if 'transport_protocol' in service_config:
+      if not re.search(service_config['transport_protocol'], transport_protocol):
+        continue
+
+    if 'application_protocol' in service_config:
+      if not re.search(service_config['application_protocol'], application_protocol):
+        continue
 
     # iterate over each scan of a specific service config
-    for scan_name, scan in service_config['scans'].items():
-      scan_command = scan['command']
-      scan_patterns = scan['patterns'] if 'patterns' in scan else []
+    for scan_name, scan_config in service_config['scans'].items():
+      if 'transport_protocol' in scan_config:
+        if not re.search(scan_config['transport_protocol'], transport_protocol):
+          continue
 
-      for service_pattern in service_patterns:
-        if re.search(service_pattern, application_protocol):
-          #log(f"application protocol '{application_protocol}' matched '{service_name}' pattern '{service_pattern}'; command '{scan_name}'")
-          scan_definitions.append(
-            ScanDefinition(
-              service_name,
-              scan_name,
-              scan_command,
-              scan_patterns,
-              True if 'run_once' in scan else False
-            )
-          )
+      if 'application_protocol' in scan_config:
+        if not re.search(scan_config['application_protocol', application_protocol]):
+          continue
+
+      log(f"suitable scan for '{transport_protocol}/{application_protocol}' found: '{service_name}:{scan_name}'")
+
+      scan_definitions.append(
+        ScanDefinition(
+          service_name,
+          scan_name,
+          scan_config['command'],
+          True if 'run_once' in scan_config else False
+        )
+      )
 
   return scan_definitions
 
@@ -527,8 +534,7 @@ def queue_service_scan_hostname(target: Target, service: Service, scan_definitio
       hostname,
       port,
       description,
-      format(scan_definition.command),
-      scan_definition.patterns
+      format(scan_definition.command)
     )
 
 def queue_service_scan_address(target: Target, service: Service, scan_definition: ScanDefinition):
@@ -596,8 +602,7 @@ def queue_service_scan_address(target: Target, service: Service, scan_definition
     address,
     port,
     description,
-    format(scan_definition.command),
-    scan_definition.patterns
+    format(scan_definition.command)
   )
   
 async def scan_services(target: Target):
@@ -614,8 +619,8 @@ async def scan_services(target: Target):
     port = service.port
     application_protocol = service.application_protocol
 
-    # find suitable scans based on the service's application protocol
-    suitable_scans = find_suitable_scans(application_protocol)
+    # find suitable scans based on the service's transport/application protocol
+    suitable_scans = find_suitable_scans(transport_protocol, application_protocol)
 
     # mark the service as "scanned" if at least 1 suitable scan was found; even though there is not even a scan scheduled yet
     service.scanned = (len(suitable_scans) > 0)
@@ -694,7 +699,7 @@ def parse_result_file(base_directory, result_file, targets, unique_services, sca
     except:
       pass
 
-    log(f"{address} ({','.join(target.hostnames)})")
+    log(f"target: {address} ({','.join(target.hostnames)})")
 
     for port in host.findall('./ports/port/state[@state="open"]/..'):
       transport_protocol = port.get('protocol')
@@ -705,7 +710,7 @@ def parse_result_file(base_directory, result_file, targets, unique_services, sca
       if service_tuple in unique_services:
         continue
 
-      log(f"service {service_tuple}")
+      log(f"service: {service_tuple}")
       unique_services.append(service_tuple)
 
       service = port.find('service')
@@ -719,7 +724,7 @@ def parse_result_file(base_directory, result_file, targets, unique_services, sca
         # we prepend the tunnel info to the application protocol:
         # '<tunnel>|<application protocol>'
         if service.get('tunnel'):
-          log(f"application protocol '{application_protocol}' is tunneled through '{service.get('tunnel')}'")
+          log(f"'{application_protocol}' is tunneled through '{service.get('tunnel')}'")
           application_protocol = service.get('tunnel') + '|' + application_protocol
 
         descriptions = []
@@ -751,6 +756,8 @@ def parse_result_file(base_directory, result_file, targets, unique_services, sca
         break
 
       if add_target:
+        log(f"adding service '{application_protocol}'")
+
         target.services.append(
           Service(
             transport_protocol,
@@ -759,8 +766,6 @@ def parse_result_file(base_directory, result_file, targets, unique_services, sca
             description
           )
         )
-
-        log(f"{transport_protocol}/{port_ID}: {application_protocol}: {description}")
 
 def parse_result_files(base_directory, result_files, scan_filters):
   targets = {}
@@ -809,8 +814,7 @@ def load_config(config_files):
       new_config = toml.load(f)
 
     if 'merge_strategy' in new_config and new_config['merge_strategy'] == 'overwrite':
-      # overwrite config
-      log("overriding config ...")
+      log("overwriting config")
       config = new_config
     else:
       log("merging config ...")
@@ -825,8 +829,11 @@ def load_config(config_files):
             config['services'][service_name] = service_config
             continue
 
-          if 'patterns' in service_config:
-            config['services'][service_name]['patterns']= service_config['patterns']
+          if 'transport_protocol' in service_config:
+            config['services'][service_name]['transport_protocol'] = service_config['transport_protocol']
+
+          if 'application_protocol' in service_config:
+            config['services'][service_name]['application_protocol']= service_config['application_protocol']
 
           if 'scans' not in service_config:
             continue
@@ -836,8 +843,11 @@ def load_config(config_files):
               config['services'][service_name]['scans'][scan_name] = scan_config
               continue
 
-            if 'patterns' in scan_config:
-              config['services'][service_name]['scans'][scan_name]['patterns'] = scan_config['patterns']
+            if 'transport_protocol' in scan_config:
+              config['services'][service_name]['scans'][scan_name]['transport_protocol'] = scan_config['transport_protocol']
+
+            if 'application_protocol' in service_config:
+              config['services'][service_name]['scans'][scan_name]['application_protocol'] = scan_config['application_protocol']
 
             if 'command' in scan_config:
               config['services'][service_name]['scans'][scan_name]['command'] = scan_config['command']

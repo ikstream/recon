@@ -31,46 +31,48 @@ password = 'pa$Sw0rd'
 [services]
 
 [services.http]
-patterns = [ 'http' ]
+application_protocol = 'http'
 
   [services.http.scans.nikto]
+  transport_protocol = 'tcp'
   command = 'nikto -ask no -Cgidirs all -host {hostname} -port {port} -nointeractive -Format xml -output "{result_file}.xml" 2>&1 | tee "{result_file}.log"'
   
   [services.http.scans.'some-tool#authenticated']
   command = 'some-tool -u "{username}" -p "{password}" ...'
 
 [services.ssh]
-patterns = [ '^ssh' ]
+application_protocol = '^ssh'
 
   [services.ssh.scans.nmap]
   command = 'nmap -Pn -sV -p {port} --script="banner,ssh2-enum-algos,ssh-hostkey,ssh-auth-methods" -oN "{result_file}.log" -oX "{result_file}.xml" {address}'
 
 [services.tls]
-patterns = [ 'https', '^ssl\|', '^tls\|' ]
+application_transport = '^ssl\||^tls\||https'
 
   [services.tls.scans.testssl]
+  transport_protocol = 'tcp'
   command = 'testssl --ip one --nodns min --mapping no-openssl --warnings off --connect-timeout 60 --openssl-timeout 60 --logfile "{result_file}.log" --jsonfile "{result_file}.json" {hostname}:{port}'
 ```
 
 Scans are grouped by the name of the protocol/service (i.e. `[services.<protocol>]`; e.g. `[services.http]`, `[services.ssh]` or `[services.tls]`).
-The `patterns` array specifies the regular expressions on which the service's name (as identified by Nmap; e.g. `https`) is matched against.
-As soon as a single entry matches, all scans in this group will be scheduled/executed.
+The `transport_protocol` and `application_protocol` variables (both optional) specify the regular expression on which the service's transport/application protocol (as identified by Nmap; e.g. `tcp` and `https`) are matched against.
 
 Each scan at least needs a name (i.e. `[services.<protocol>.scans.<scan name>]`) and a command (i.e. `command = '...'`).
 The scan name can contain tags (e.g. `some-tool#authenticated`).
 The command can make use of the following variables (i.e. `{variable}`):
 
 * all variables defined in the `[globals]` group
-* `address`: this holds the host's IP address
 * `transport_protocol`: this is either `tcp` or `udp`
-* `port`: this holds the port number where a specific service was found
-* `result_file`: this is the path to where the results are stored (i.e. `/path/to/project/recon/<address>/<service>[,<transport protocol>,<port>,...],<tool>.<ext>`)
-* `application_protocol`: this holds the identified application protocol (e.g. `http`, `ssh`, `smtp`, etc.)
+* `application_protocol`: as identified by Nmap (e.g. `https`, `ssh`)
+* `address`: this holds the host's IP address
+* `address_type`: this is either `IPv4`, `IPv6` or `hostname`
+* `port`: this holds the port number the specific service uses
+* `result_file`: this is the path (without file extension) to where the results are stored (i.e. `/path/to/project/recon/<address>/<service>[,<transport protocol>,<port>,...],<tool>`)
 
 In case the service was identified as a web service, the following additional variables are available:
 
-* `hostname`: this holds either the host's DNS name or, as a fallback, its IP address
 * `scheme`: this is either `http` or `https`
+* `hostname`: this holds either the host's DNS name or, as a fallback, its IP address
 
 ## analyzer
 
