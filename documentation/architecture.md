@@ -28,8 +28,6 @@ merge_strategy = 'overwrite'
 username = 'user'
 password = 'pa$Sw0rd'
 
-[services]
-
 [[services]]
 name = 'http'
 application_protocol = 'http'
