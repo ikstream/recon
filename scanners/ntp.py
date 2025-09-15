@@ -67,11 +67,7 @@ def mode_6_response(response):
              +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
   """
 
-  #print(f"response:\n{response}") #TODO
-
   (offset, count) = struct.unpack('!HH', response[8 : 12])
-  #print(f"offset: {offset}") #TODO
-  #print(f"count: {count}") #TODO
 
   data = []
   # "parse" the key-value list
@@ -250,8 +246,6 @@ def process(args):
               version = m.group('version')
             else:
               version = v[8:]
-
-            #print(f"version: {version}") #TODO
 
           data += d
           response, _ = udp_socket.recvfrom(1024)
