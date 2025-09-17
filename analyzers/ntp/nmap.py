@@ -75,6 +75,7 @@ class Parser(AbstractParser):
             service['issues'].append(
               Issue(
                 "Mode 7",
+                implementation = 3,
                 req_code = 42,
                 amplification_factor = "?"
               )
@@ -109,8 +110,14 @@ class Parser(AbstractParser):
       return m.group('version')
 
   def _parse_monlist(self, monlist_node):
-    # TODO: properly parse this as soon as we have access to an XML result
-    return ["Nmap script scan result not parsed: 'ntp-monlist'"]
+    addresses = []
+
+    for line in monlist_node.get('output').split('\n'):
+      if re.match('   ', line):
+        address = line.strip()
+        addresses.append(f"`{address}`")
+
+    return addresses
 
   def _parse_info(self, info_node):
     misc = []

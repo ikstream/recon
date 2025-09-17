@@ -30,20 +30,39 @@ class Parser(AbstractParser):
     service = copy.deepcopy(SERVICE_SCHEMA)
     service.update(result)
 
-    if 'mode_6' in service and service['mode_6']:
-      service['issues'].append(
-        Issue(
-          "Mode 6",
-          **service['mode_6']
-        )
-      )
+    if 'tests' in service and '2' in service['tests']:
+      ntp_v2 = service['tests']['2']
 
-    if 'mode_7' in service and service['mode_7']:
-      service['issues'].append(
-        Issue(
-          "Mode 7",
-          **service['mode_7']
-        )
-      )
+      if '6' in ntp_v2 and ntp_v2['6']:
+        mode_6 = ntp_v2['6']
+        for opcode, result in mode_6.items():
+          amplification_factor = result['amplification_factor']
+          service['issues'].append(
+            Issue(
+              "Mode 6",
+              opcode = opcode,
+              amplification_factor = amplification_factor,
+            )
+          )
+
+          for data in result['data']:
+            service['misc'].append(data)
+
+      if '7' in ntp_v2 and ntp_v2['7']:
+        mode_7 = ntp_v2['7']
+        for implementation, request_codes in mode_7.items():
+          for req_code, result in request_codes.items():
+            amplification_factor = result['amplification_factor']
+            service['issues'].append(
+              Issue(
+                "Mode 7",
+                implementation = implementation,
+                req_code = req_code,
+                amplification_factor = amplification_factor
+              )
+            )
+
+            for data in result['data']:
+              service['misc'].append(data)
 
     self.services[identifier] = service
