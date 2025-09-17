@@ -4,6 +4,7 @@
 # idea: https://github.com/ikstream/ntp-amp-check
 
 import argparse
+import datetime
 import ipaddress
 import json
 import pathlib
@@ -17,6 +18,9 @@ TIMEOUT = 2 # seconds
 
 VERSION_NUMBER = 2
 
+OPCODE_READ_STATUS = 1
+OPCODE_READ_VARIABLES = 2
+
 IMPLEMENTATION_UNIV = 0
 IMPLEMENTATION_XNTPD_OLD = 2 # pre IPv6
 IMPLEMENTATION_XNTPD = 3
@@ -25,15 +29,86 @@ REQUEST_PEER_LIST = 0
 REQUEST_MON_GETLIST = 20
 REQUEST_MON_GETLIST_1 = 42
 
+ASSOCIATION_MODES = {
+  1: 'symmetric',
+  2: 'symmetric',
+  3: 'client',
+  4: 'server',
+  5: 'broadcast server'
+}
+
+def mode_3_request(
+  leap_indicator,
+  version_number,
+  # mode = 3
+  peer_clock_stratum,
+  peer_polling_interval,
+  peer_clock_precision,
+  root_delay,
+  root_dispersion,
+  reference_ID,
+  reference_timestamp,
+  origin_timestamp,
+  receive_timestamp,
+  transmit_timestamp
+):
+  """
+  packet structure from Wireshark
+  """
+
+  flags = (leap_indicator << 6) | (version_number << 3) | 3
+
+  return struct.pack('! B B B B L L 4s Q Q Q Q', flags, peer_clock_stratum, peer_polling_interval, peer_clock_precision, root_delay, root_dispersion, reference_ID, reference_timestamp, origin_timestamp, receive_timestamp, transmit_timestamp)
+
+def parse_mode_3_response(response):
+  # packet structure from Wireshark
+
+  seconds, fractions = struct.unpack('!LL', response[32 : 32 + 8])
+  epoch_offset = 2208988800 # https://datatracker.ietf.org/doc/rfc868/
+  timestamp = seconds - epoch_offset + fractions / 0x10000000
+
+  dt = datetime.datetime.fromtimestamp(timestamp)
+  formatted_datetime = dt.strftime('%Y-%m-%d %H:%M:%S.%f')
+  print(f"  {formatted_datetime}")
+
+  return formatted_datetime
+
+def get_date_time(udp_socket, address):
+  print(f"\nrequesting current time ...")
+  request = mode_3_request(
+    0b11, # clock unsynchronized
+    VERSION_NUMBER,
+    0,
+    0,
+    0,
+    0,
+    0,
+    b'',
+    0,
+    0,
+    0,
+    0xffffffffffffffff # some time in 2036-02-07
+  )
+
+  data = []
+  response_length = 0
+
+  try:
+    udp_socket.sendto(request, (address, PORT))
+    response = udp_socket.recv(1024)
+    return parse_mode_3_response(response)
+  except socket.timeout:
+    print("no response")
+    return
+
 def mode_6_request(opcode, version_number=VERSION_NUMBER):
   """
-  NTP Message Format
   from https://datatracker.ietf.org/doc/html/rfc9327#section-2
 
   bytes      |       0       |       1       |       2       |       3       |
   bits       |7 6 5 4 3 2 1 0|7 6 5 4 3 2 1 0|7 6 5 4 3 2 1 0|7 6 5 4 3 2 1 0|
              +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-  bytes 0-3  |LI |  VN |Mode |R|E|M| opcode  |       Sequence Number         |
+  bytes 0-3  |LI | VN  |Mode |R|E|M| opcode  |       Sequence Number         |
              +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
   bytes 4-7  |            Status             |       Association ID          |
              +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
@@ -52,17 +127,16 @@ def mode_6_request(opcode, version_number=VERSION_NUMBER):
   rest (8 bytes): 0
   """
 
-  return struct.pack('<BBxx', version_number<<3 | 6, opcode) + b'\x00' * 8
+  return struct.pack('!BBxx', version_number << 3 | 6, opcode) + b'\x00' * 8
 
 def parse_mode_6_response(response):
   """
-  NTP Message Format
   from https://datatracker.ietf.org/doc/html/rfc9327#section-2
 
   bytes      |       0       |       1       |       2       |       3       |
   bits       |7 6 5 4 3 2 1 0|7 6 5 4 3 2 1 0|7 6 5 4 3 2 1 0|7 6 5 4 3 2 1 0|
              +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-  bytes 0-3  |LI |  VN |Mode |R|E|M| opcode  |       Sequence Number         |
+  bytes 0-3  |LI | VN  |Mode |R|E|M| opcode  |       Sequence Number         |
              +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
   bytes 4-7  |            Status             |       Association ID          |
              +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
@@ -94,7 +168,7 @@ def parse_mode_6_response(response):
   return data
 
 def test_mode_6(udp_socket, address, opcode):
-  print(f"\nsending NTPv2 'mode 6, opcode {opcode}' request ...")
+  print(f"\nsending NTPv{VERSION_NUMBER} 'mode 6, opcode {opcode}' request ...")
   request = mode_6_request(opcode)
 
   data = []
@@ -130,7 +204,6 @@ def test_mode_6(udp_socket, address, opcode):
 
 def mode_7_request(implementation, request_code, version_number=VERSION_NUMBER):
   """
-  NTP Mode 7 Message Format
   from https://blog.qualys.com/vulnerabilities-threat-research/2014/01/21/how-qualysguard-detects-vulnerability-to-ntp-amplification-attacks
 
   bytes      |       0       |       1       |       2       |       3       |
@@ -154,11 +227,11 @@ def mode_7_request(implementation, request_code, version_number=VERSION_NUMBER):
   """
 
   # https://docs.python.org/3/library/struct.html#format-characters
-  return struct.pack('<BxBB', version_number<<3 | 7, implementation, request_code) + b'\x00'*4
+  return struct.pack('!BxBB', version_number << 3 | 7, implementation, request_code) + b'\x00'*4
 
 def parse_peerlist(peerlist):
   """
-  packet structure from
+  packet structure from:
   * https://svn.nmap.org/nmap/scripts/ntp-monlist.nse
   * Wireshark
 
@@ -172,7 +245,7 @@ def parse_peerlist(peerlist):
 
   addr: remote address (IPv4)
   P: remote port
-  M: HMode (client/server)
+  M: association mode (client/server)
   F: flags
   IPv6: flag to indicate that IPv6 addresses are used
 
@@ -185,11 +258,10 @@ def parse_peerlist(peerlist):
     remote_address = ipaddress.IPv6Address(peerlist[16 : 16 + 16])
     address_string = f"[{str(remote_address)}]"
 
-  port = struct.unpack('!BB', peerlist[5 : 7])[0]
+  port = struct.unpack('!H', peerlist[5 : 5 + 2])[0]
+  assoc_mode = peerlist[6]
 
-  hmode = peerlist[6]
-
-  return f"peer list: {address_string}:{port} ({hmode})"
+  return f"remote address: {address_string} ({ASSOCIATION_MODES[assoc_mode]})"
 
 def parse_monlist(monlist):
   """
@@ -220,7 +292,7 @@ def parse_monlist(monlist):
   RA: remote address (IPv4)
   LA: local address (IPv4)
   P: port
-  M: mode (client/server/peers)
+  M: association mode (client/server/peers)
   V: version
   IPv6: flag to indicate that IPv6 addresses are used
   """
@@ -236,9 +308,10 @@ def parse_monlist(monlist):
     local_address = ipaddress.IPv6Address(monlist[56 : 56 + 16])
     local_address_str = f"[{str(local_address)}]"
 
-  port = struct.unpack('!BB', monlist[28 : 30])[0]
+  port = struct.unpack('!H', monlist[28 : 28 + 2])[0]
+  assoc_mode = monlist[30]
 
-  return f"remote address: {remote_address_str}, local address: {local_address_str}"
+  return f"remote address: {remote_address_str} ({ASSOCIATION_MODES[assoc_mode]}), local address: {local_address_str}"
 
 def parse_mode_7_response(response):
   """
@@ -296,7 +369,7 @@ def parse_mode_7_response(response):
   return data
 
 def test_mode_7(udp_socket, address, implementation, req_code):
-  print(f"\nsending NTPv2 'mode 7, implementation {implementation}, req code {req_code}' request ...")
+  print(f"\nsending NTPv{VERSION_NUMBER} 'mode 7, implementation {implementation}, req code {req_code}' request ...")
   request = mode_7_request(implementation, req_code)
 
   data = []
@@ -359,7 +432,9 @@ def process(args):
   with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as udp_socket:
     udp_socket.settimeout(TIMEOUT)
 
-    opcode = 2 # read variables
+    receive_timestamp = get_date_time(udp_socket, address)
+
+    opcode = OPCODE_READ_VARIABLES
     result = test_mode_6(udp_socket, address, opcode)
 
     if result:
@@ -402,6 +477,7 @@ def process(args):
       'address': address,
       'public': public,
       'port': PORT,
+      'receive_timestamp': receive_timestamp,
       'version': version,
       'tests': tests,
     }
