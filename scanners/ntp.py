@@ -1,7 +1,16 @@
 #!/usr/bin/env python3
 
-# polls an NTP server and estimates its security based on the replies.
-# idea: https://github.com/ikstream/ntp-amp-check
+'''
+poll an NTP server and estimates its security based on the replies.
+
+1. send a mode 3 (client) request, to get the current time
+  this request will show up in (3)
+2. send a mode 6 (read variables) request
+3. send a mode 7 (REQUEST_MON_GETLIST_1) request
+if (3) succeeds, send a mode 7 (PEER_LIST) request
+
+idea: https://github.com/ikstream/ntp-amp-check
+'''
 
 import argparse
 import datetime
