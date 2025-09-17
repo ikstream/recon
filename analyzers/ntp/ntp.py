@@ -39,7 +39,7 @@ class Parser(AbstractParser):
           amplification_factor = result['amplification_factor']
           service['issues'].append(
             Issue(
-              "Mode 6",
+              "mode 6",
               opcode = opcode,
               amplification_factor = amplification_factor,
             )
@@ -55,7 +55,7 @@ class Parser(AbstractParser):
             amplification_factor = result['amplification_factor']
             service['issues'].append(
               Issue(
-                "Mode 7",
+                "mode 7",
                 implementation = implementation,
                 req_code = req_code,
                 amplification_factor = amplification_factor
