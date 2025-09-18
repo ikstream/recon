@@ -556,9 +556,9 @@ def process(args):
 
       # look for version strings in the data array
       # e.g. `version="ntpd 4.2.6p5@1.2349-o Fri Jul  6 20:19:54 UTC 2018 (1)"`
-      for version_info in [data for data in result['data'] if data.startswith('version=')]:
+      for version_info in [data for data in result['data'] if data.startswith('`version=')]:
         m = re.search(
-          r'version="ntpd (?P<version>[^ ]+)',
+          r'`version="ntpd (?P<version>[^ ]+)',
           version_info
         )
 
