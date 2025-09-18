@@ -30,39 +30,36 @@ class Parser(AbstractParser):
     service = copy.deepcopy(SERVICE_SCHEMA)
     service.update(result)
 
-    if 'tests' in service and '2' in service['tests']:
-      ntp_v2 = service['tests']['2']
-
-      if '6' in ntp_v2 and ntp_v2['6']:
-        mode_6 = ntp_v2['6']
-        for opcode, result in mode_6.items():
-          amplification_factor = result['amplification_factor']
-          service['issues'].append(
-            Issue(
-              "mode 6",
-              opcode = opcode,
-              amplification_factor = amplification_factor,
-            )
-          )
-
-          for data in result['data']:
-            service['misc'].append(data)
-
-      if '7' in ntp_v2 and ntp_v2['7']:
-        mode_7 = ntp_v2['7']
-        for implementation, request_codes in mode_7.items():
-          for req_code, result in request_codes.items():
+    if 'tests' in service:
+      for ntp_version, test in service['tests'].items():
+        if '6' in test and test['6']:
+          for opcode, result in test['6'].items():
             amplification_factor = result['amplification_factor']
             service['issues'].append(
               Issue(
-                "mode 7",
-                implementation = implementation,
-                req_code = req_code,
-                amplification_factor = amplification_factor
+                "mode 6",
+                opcode = opcode,
+                amplification_factor = amplification_factor,
               )
             )
 
             for data in result['data']:
               service['misc'].append(data)
+
+        if '7' in test and test['7']:
+          for implementation, request_codes in test['7'].items():
+            for req_code, result in request_codes.items():
+              amplification_factor = result['amplification_factor']
+              service['issues'].append(
+                Issue(
+                  "mode 7",
+                  implementation = implementation,
+                  req_code = req_code,
+                  amplification_factor = amplification_factor
+                )
+              )
+
+              for data in result['data']:
+                service['misc'].append(data)
 
     self.services[identifier] = service

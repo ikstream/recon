@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 '''
-poll an NTP server and estimates its security based on the replies.
+this script polls an NTP server and estimates its security based on the replies.
 
 1. send a mode 3 (client) request, to get the current time
   this request will show up in (3)
@@ -66,18 +66,92 @@ def mode_3_request(
 ):
   """
   packet structure from Wireshark
+
+  bytes       |       0       |       1       |       2       |       3       |
+  bits        |7 6 5 4 3 2 1 0|7 6 5 4 3 2 1 0|7 6 5 4 3 2 1 0|7 6 5 4 3 2 1 0|
+              +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+  bytes 0-3   |LI | VN  |Mode |      PCS      |      PPI      |      PCP      |
+              +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+  bytes 4-7   |                           root delay                          |
+              +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+  bytes 8-11  |                        root dispersion                        |
+              +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+  bytes 12-15 |                          reference ID                         |
+              +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+  bytes 16-23 |                reference timestamp: seconds                   |
+              |                reference timestamp: fractions                 |
+              +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+  bytes 24-31 |                  origin timestamp: seconds                    |
+              |                  origin timestamp: fractions                  |
+              +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+  bytes 32-39 |                 receive timestamp: seconds                    |
+              |                 receive timestamp: fractions                  |
+              +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+  bytes 40-47 |                 transit timestamp: seconds                    |
+              |                 transit timestamp: fractions                  |
+              +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+  LI: leap indicator: 0
+  VN: version number: 1...4
+  Mode: 3
+  PCS: peer clock stratum
+  PPI: peer polling interval
+  PCP: peer clock precision
   """
 
   flags = (leap_indicator << 6) | (version_number << 3) | 3
 
-  return struct.pack('! B B B B L L 4s Q Q Q Q', flags, peer_clock_stratum, peer_polling_interval, peer_clock_precision, root_delay, root_dispersion, reference_ID, reference_timestamp, origin_timestamp, receive_timestamp, transmit_timestamp)
+  return struct.pack(
+    '! B B B B    L L    4s    Q Q Q Q',
+    flags, peer_clock_stratum, peer_polling_interval, peer_clock_precision,
+    root_delay, root_dispersion,
+    reference_ID,
+    reference_timestamp, origin_timestamp, receive_timestamp, transmit_timestamp
+  )
 
 def parse_mode_3_response(response):
-  # packet structure from Wireshark
+  """
+  packet structure from Wireshark
+
+  bytes       |       0       |       1       |       2       |       3       |
+  bits        |7 6 5 4 3 2 1 0|7 6 5 4 3 2 1 0|7 6 5 4 3 2 1 0|7 6 5 4 3 2 1 0|
+              +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+  bytes 0-3   |LI | VN  |Mode |      PCS      |      PPI      |      PCP      |
+              +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+  bytes 4-7   |                           root delay                          |
+              +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+  bytes 8-11  |                        root dispersion                        |
+              +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+  bytes 12-15 |                          reference ID                         |
+              +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+  bytes 16-23 |                reference timestamp: seconds                   |
+              |                reference timestamp: fractions                 |
+              +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+  bytes 24-31 |                  origin timestamp: seconds                    |
+              |                  origin timestamp: fractions                  |
+              +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+  bytes 32-39 |                 receive timestamp: seconds                    |
+              |                 receive timestamp: fractions                  |
+              +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+  bytes 40-47 |                 transit timestamp: seconds                    |
+              |                 transit timestamp: fractions                  |
+              +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+  LI: leap indicator: 0
+  VN: version number: 1...4
+  Mode: 3
+  PCS: peer clock stratum
+  PPI: peer polling interval
+  PCP: peer clock precision
+  """
 
   seconds, fractions = struct.unpack('!LL', response[32 : 32 + 8])
-  epoch_offset = 2208988800 # https://datatracker.ietf.org/doc/rfc868/
-  timestamp = seconds - epoch_offset + fractions / 0x10000000
+
+  # NTP epoch starts at 1900-01-01
+  # UNIX epoch starts at 1970-01-01
+  # the difference is 2208988800 seconds
+  # see https://www.rfc-editor.org/rfc/rfc5905#page-14
+  timestamp = seconds - 2208988800 + fractions / 0x10000000
 
   dt = datetime.datetime.fromtimestamp(timestamp)
   formatted_datetime = dt.strftime('%Y-%m-%d %H:%M:%S.%f')
@@ -85,7 +159,7 @@ def parse_mode_3_response(response):
 
   return formatted_datetime
 
-def get_date_time(udp_socket, address):
+def test_mode_3(udp_socket, address):
   print(f"\nrequesting current time ...")
   request = mode_3_request(
     0b11, # clock unsynchronized
@@ -135,7 +209,7 @@ def mode_6_request(opcode, version_number=VERSION_NUMBER):
   opcode: command ID: 0...31
   Sequence Number: 0
 
-  rest (8 bytes): 0
+  remaining 8 bytes: 0
   """
 
   return struct.pack('!BBxx', version_number << 3 | 6, opcode) + b'\x00' * 8
@@ -160,12 +234,12 @@ def parse_mode_6_response(response):
   """
 
   r_e_m_opcode = response[1]
-  error = (r_e_m_opcode & 0b01000000) >> 6
+  error = (r_e_m_opcode >> 6) & 0b1
   if error != 0:
     print("error")
     return
 
-  more = (r_e_m_opcode & 0b00100000) >> 5
+  more = (r_e_m_opcode >> 5) & 0b1
 
   opcode = r_e_m_opcode & 0b11111
 
@@ -176,7 +250,7 @@ def parse_mode_6_response(response):
   for d in struct.unpack(f'!{count}s', response[12 : 12 + count])[0].decode().split(','):
     key_value = d.strip()
     print(f"  {key_value}")
-    data.append(key_value)
+    data.append(f"`{key_value}`")
 
   return (data, more)
 
@@ -353,7 +427,7 @@ def parse_mode_7_response(response):
              +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
   """
 
-  more = (response[0] & 0b01000000) >> 6
+  more = (response[0] >> 6) & 0b1
   implementation, req_code = struct.unpack('!BB', response[2 : 4])
 
   if implementation not in (2, IMPLEMENTATION_XNTPD):
@@ -463,7 +537,14 @@ def process(args):
   with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as udp_socket:
     udp_socket.settimeout(TIMEOUT)
 
-    receive_timestamp = get_date_time(udp_socket, address)
+    result = test_mode_3(udp_socket, address)
+
+    if result:
+      current_datetime = datetime.datetime.now()
+      tests[VERSION_NUMBER][3] = {
+        'current timestamp': current_datetime.strftime('%Y-%m-%d %H:%M:%S.%f'),
+        'receive timestamp': result
+      }
 
     opcode = OPCODE_READ_VARIABLES
     result = test_mode_6(udp_socket, address, opcode)
@@ -508,7 +589,6 @@ def process(args):
       'address': address,
       'public': public,
       'port': PORT,
-      'receive_timestamp': receive_timestamp,
       'version': version,
       'tests': tests,
     }

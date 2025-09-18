@@ -74,7 +74,7 @@ class Parser(AbstractParser):
           if script_ID == 'ntp-monlist':
             service['issues'].append(
               Issue(
-                "Mode 7",
+                "mode 7",
                 implementation = 3,
                 req_code = 42,
                 amplification_factor = "?"
@@ -86,7 +86,7 @@ class Parser(AbstractParser):
           if script_ID == 'ntp-info':
             service['issues'].append(
               Issue(
-                "Mode 6",
+                "mode 6",
                 opcode = 2,
                 amplification_factor = "?"
               )
@@ -112,10 +112,21 @@ class Parser(AbstractParser):
   def _parse_monlist(self, monlist_node):
     addresses = []
 
+    assoc_type = None
     for line in monlist_node.get('output').split('\n'):
+      if re.match(r'  \w', line):
+        assoc_type = line.strip().lower()
+
+        if assoc_type == 'alternative target interfaces:':
+          assoc_type = re.sub(r's:$', '', assoc_type)
+        elif re.match(r'(public|private) (client|server|peer)s \(\d+\)', assoc_type):
+          assoc_type = re.sub(r's \(\d+\)$', '', assoc_type)
+        elif re.match(r'other associations \(\d+\)', assoc_type):
+          assoc_type = re.sub(r's \(\d+\)$', '', assoc_type)
+
       if re.match('   ', line):
-        address = line.strip()
-        addresses.append(f"`{address}`")
+        for address in re.split(r'\s+', line.strip()):
+          addresses.append(f"{assoc_type}: {address}")
 
     return addresses
 

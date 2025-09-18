@@ -46,12 +46,13 @@ class Analyzer(AbstractAnalyzer):
         )
 
       for info in service['misc']:
-        issues.append(
-          Issue(
-            "additional info",
-            info = info
+        if re.match(self.recommendations['additional_info_filter'], info):
+          issues.append(
+            Issue(
+              "additional info",
+              info = info
+            )
           )
-        )
 
     return services
 

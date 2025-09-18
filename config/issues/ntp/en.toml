@@ -4,16 +4,22 @@ description = "public NTP server"
 ["protocol version"]
 description = "used version: `{used_version}`"
 recommendations = [
-  "use version `{recommended_version}`"
+  "update to version `{recommended_version}`"
 ]
 
 ["mode 6"]
 description = "answers to mode 6 commands (opcode {opcode}); amplification factor: {amplification_factor}"
+recommendations = [
+  "deactivate mode 6"
+]
 
 ["mode 7"]
 description = "answers to mode 7 commands (implementation {implementation}, req code {req_code}); amplification factor: {amplification_factor}"
 references = [
   "[CVE-2013-5211](https://nvd.nist.gov/vuln/detail/CVE-2013-5211)"
+]
+recommendations = [
+  "deactivate mode 7"
 ]
 
 ["additional info"]
