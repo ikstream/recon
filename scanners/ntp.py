@@ -206,6 +206,7 @@ def test_mode_6(udp_socket, address, opcode):
       try:
         response = udp_socket.recv(1024)
       except socket.timeout:
+        print("no response")
         break
     else:
       break
@@ -416,6 +417,7 @@ def test_mode_7(udp_socket, address, implementation, req_code):
       try:
         response = udp_socket.recv(1024)
       except socket.timeout:
+        print("no response")
         break
     else:
       break
