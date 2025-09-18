@@ -23,7 +23,7 @@ import struct
 import sys
 
 PORT = 123
-TIMEOUT = 2 # seconds
+TIMEOUT = 5 # seconds
 
 VERSION_NUMBER = 2
 
@@ -100,7 +100,6 @@ def get_date_time(udp_socket, address):
   )
 
   data = []
-  response_length = 0
 
   try:
     udp_socket.sendto(request, (address, PORT))
@@ -158,10 +157,12 @@ def parse_mode_6_response(response):
   """
 
   r_e_m_opcode = response[1]
-  error_bit = r_e_m_opcode & 0b01000000 >> 6
-  if error_bit != 0:
+  error = (r_e_m_opcode & 0b01000000) >> 6
+  if error != 0:
     print("error")
     return
+
+  more = (r_e_m_opcode & 0b00100000) >> 5
 
   opcode = r_e_m_opcode & 0b11111
 
@@ -174,7 +175,7 @@ def parse_mode_6_response(response):
     print(f"  {key_value}")
     data.append(key_value)
 
-  return data
+  return (data, more)
 
 def test_mode_6(udp_socket, address, opcode):
   print(f"\nsending NTPv{VERSION_NUMBER} 'mode 6, opcode {opcode}' request ...")
@@ -191,15 +192,22 @@ def test_mode_6(udp_socket, address, opcode):
     return
 
   while True:
-    try:
-      response_length += len(response)
-      d = parse_mode_6_response(response)
-      if d:
-        data += d
-      else:
+    more = False
+    response_length += len(response)
+    result = parse_mode_6_response(response)
+
+    if result:
+      data += result[0]
+      more = result[1]
+    else:
+      break
+
+    if more:
+      try:
+        response = udp_socket.recv(1024)
+      except socket.timeout:
         break
-      response = udp_socket.recv(1024)
-    except socket.timeout:
+    else:
       break
 
   if response_length:
@@ -341,6 +349,7 @@ def parse_mode_7_response(response):
              +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
   """
 
+  more = (response[0] & 0b01000000) >> 6
   implementation, req_code = struct.unpack('!BB', response[2 : 4])
 
   if implementation not in (2, IMPLEMENTATION_XNTPD):
@@ -375,7 +384,7 @@ def parse_mode_7_response(response):
     print(f"  {d}")
     data.append(d)
 
-  return data
+  return (data, more)
 
 def test_mode_7(udp_socket, address, implementation, req_code):
   print(f"\nsending NTPv{VERSION_NUMBER} 'mode 7, implementation {implementation}, req code {req_code}' request ...")
@@ -392,15 +401,23 @@ def test_mode_7(udp_socket, address, implementation, req_code):
     return
 
   while True:
-    try:
-      response_length += len(response)
-      d = parse_mode_7_response(response)
-      if d:
-        data += d
-      else:
+    more = False
+    response_length += len(response)
+    result = parse_mode_7_response(response)
+
+    if result:
+      data += result[0]
+      more = result[1]
+    else:
+      break
+
+    if more:
+      print("expecting more data ...")
+      try:
+        response = udp_socket.recv(1024)
+      except socket.timeout:
         break
-      response = udp_socket.recv(1024)
-    except socket.timeout:
+    else:
       break
 
   if response_length:
