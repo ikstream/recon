@@ -5,11 +5,14 @@ poll an NTP server and estimates its security based on the replies.
 
 1. send a mode 3 (client) request, to get the current time
   this request will show up in (3)
-2. send a mode 6 (read variables) request
-3. send a mode 7 (REQUEST_MON_GETLIST_1) request
-if (3) succeeds, send a mode 7 (PEER_LIST) request
+2. send a mode 6 (READ_VARIABLES) request
+3. send a mode 7 (XNTPD, MON_GETLIST_1) request
+if (3) succeeds, send a mode 7 (XNTPD, PEER_LIST) request
 
-idea: https://github.com/ikstream/ntp-amp-check
+idea:
+- https://github.com/ikstream/ntp-amp-check
+- https://nmap.org/nsedoc/scripts/ntp-info.html
+- https://nmap.org/nsedoc/scripts/ntp-monlist.html
 '''
 
 import argparse
