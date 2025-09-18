@@ -106,7 +106,7 @@ def get_date_time(udp_socket, address):
     response = udp_socket.recv(1024)
     return parse_mode_3_response(response)
   except socket.timeout:
-    print("no response")
+    print(f"no response within {TIMEOUT} seconds")
     return
 
 def mode_6_request(opcode, version_number=VERSION_NUMBER):
@@ -188,7 +188,7 @@ def test_mode_6(udp_socket, address, opcode):
     udp_socket.sendto(request, (address, PORT))
     response = udp_socket.recv(1024)
   except socket.timeout:
-    print("no response")
+    print(f"no response within {TIMEOUT} seconds")
     return
 
   while True:
@@ -206,7 +206,7 @@ def test_mode_6(udp_socket, address, opcode):
       try:
         response = udp_socket.recv(1024)
       except socket.timeout:
-        print("no response")
+        print(f"no response within {TIMEOUT} seconds")
         break
     else:
       break
@@ -398,7 +398,7 @@ def test_mode_7(udp_socket, address, implementation, req_code):
     udp_socket.sendto(request, (address, PORT))
     response = udp_socket.recv(1024)
   except socket.timeout:
-    print("no response")
+    print(f"no response within {TIMEOUT} seconds")
     return
 
   while True:
@@ -417,7 +417,7 @@ def test_mode_7(udp_socket, address, implementation, req_code):
       try:
         response = udp_socket.recv(1024)
       except socket.timeout:
-        print("no response")
+        print(f"no response within {TIMEOUT} seconds")
         break
     else:
       break
