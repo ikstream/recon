@@ -8,13 +8,13 @@ recommendations = [
 ]
 
 ["mode 6"]
-description = "antwortet auf Mode-6-Anfragen (opcode {opcode}); Verstärkungsfaktor: {amplification_factor}"
+description = "antwortet auf Mode-6-Anfragen (NTPv{version}, opcode {opcode}); Verstärkungsfaktor: {amplification_factor}"
 recommendations = [
   "deaktivieren Sie Mode-6"
 ]
 
 ["mode 7"]
-description = "antwortet auf Mode-7-Anfragen (implementation {implementation}, req code {req_code}); Verstärkungsfaktor: {amplification_factor}"
+description = "antwortet auf Mode-7-Anfragen (NTPv{version}, implementation {implementation}, req code {req_code}); Verstärkungsfaktor: {amplification_factor}"
 references = [
   "[CVE-2013-5211](https://nvd.nist.gov/vuln/detail/CVE-2013-5211)"
 ]

@@ -38,6 +38,7 @@ class Parser(AbstractParser):
             service['issues'].append(
               Issue(
                 "mode 6",
+                version = ntp_version,
                 opcode = opcode,
                 amplification_factor = amplification_factor,
               )
@@ -53,6 +54,7 @@ class Parser(AbstractParser):
               service['issues'].append(
                 Issue(
                   "mode 7",
+                  version = ntp_version,
                   implementation = implementation,
                   req_code = req_code,
                   amplification_factor = amplification_factor
