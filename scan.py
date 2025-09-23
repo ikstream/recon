@@ -446,7 +446,7 @@ def find_suitable_scans(transport_protocol, application_protocol):
           continue
 
       if 'application_protocol' in scan_config:
-        if not re.search(scan_config['application_protocol', application_protocol]):
+        if not re.search(scan_config['application_protocol'], application_protocol):
           continue
 
       log(f"suitable scan for '{transport_protocol}/{application_protocol}' found: '{service_name}:{scan_name}'")
