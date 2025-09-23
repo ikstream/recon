@@ -346,16 +346,6 @@ def create_summary(target: Target):
 
       f.write(f"* {service.port} ({service.transport_protocol}): `{description}`\n")
 
-async def read_command_results(process, scan):
-  # parse STDOUT
-
-  while True:
-    line = await process.stdout.readline()
-    if line:
-      line = str(line.rstrip(), 'utf8', 'ignore')
-    else:
-      return
-
 async def run_command(scan: Scan):
 
   # make sure that only a specific number of scans are running per target
@@ -385,9 +375,9 @@ async def run_command(scan: Scan):
       )
 
       try:
-        # wait for the task (i.e. read command results) to finish within the specified timeout (in seconds)
+        # wait for the process to finish within the specified timeout (in seconds)
         # https://docs.python.org/3/library/asyncio-task.html#asyncio.wait_for
-        await asyncio.wait_for(read_command_results(process, scan), timeout=MAX_TIME)
+        await asyncio.wait_for(process.wait(), timeout=MAX_TIME)
 
         return_code = process.returncode
 
@@ -400,6 +390,7 @@ async def run_command(scan: Scan):
           log(f"[{scan_description}]\t{error_msg}")
       except asyncio.exceptions.TimeoutError:
         log(f"[{scan_description}]\ttimeout")
+        process.terminate()
         return_code = "timeout"
       except asyncio.exceptions.CancelledError:
         log(f"[{scan_description}]\tcancelled")
