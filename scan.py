@@ -353,12 +353,6 @@ async def read_command_results(process, scan):
     line = await process.stdout.readline()
     if line:
       line = str(line.rstrip(), 'utf8', 'ignore')
-
-      for pattern in scan.patterns:
-        match = re.search(pattern, line)
-        if match:
-          info = match.group(0)
-          #TODO: do something with the info
     else:
       return
 
