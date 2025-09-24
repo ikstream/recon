@@ -74,6 +74,7 @@ class UserInterface:
     self.window.nodelay(True)
 
     self.screen_height = screen_height
+    self.header = curses.newpad(4, screen_width)
     self.main = curses.newpad(screen_height + 1, screen_width + 1)
     self.footer = curses.newpad(len(FOOTER_MESSAGES), screen_width)
 
@@ -142,11 +143,11 @@ class UserInterface:
     self.window.clear()
     self.window.refresh()
 
-    self.main.clear()
-
     screen_height, screen_width = self.window.getmaxyx()
 
-    line = 2
+    self.main.clear()
+
+    line = 0
     number_of_targets_completed = 0
     number_of_scans_total = 0
     number_of_scans_completed_total = 0
@@ -174,8 +175,6 @@ class UserInterface:
       if not target_is_active:
         continue
 
-      line += 1
-
       if line < self.screen_height:
         self.main.addstr(line, 0, f"{target.address}")
         if not STOPPING:
@@ -191,30 +190,39 @@ class UserInterface:
           continue
 
         scan_description = ': '.join(scan.description[1:])
-        self.main.addstr(line, 0, scan_description, curses.A_DIM)
+        self.main.addstr(line, 0, scan_description)
         line += 1
+
+      line += 1
+
+    self.main.refresh(
+      0, 0,
+      4, 0,
+      screen_height - 1, screen_width - 1
+    )
 
     self.progress = number_of_scans_completed_total / number_of_scans_total
 
-    line = 0
-    self.main.addstr(line, 0, TITLE, curses.A_BOLD)
+    self.header.clear()
+
+    self.header.addstr(0, 0, TITLE, curses.A_BOLD)
+    self.header.addstr(1, 0, f"running {number_of_scans_total} scans, targeting {len(TARGETS)} hosts")
     if STOPPING:
-      self.main.addstr(line, len(TITLE) + 1, "... stopping ...", curses.A_BOLD)
-      self.main.addstr(line + 1, 0, "waiting for the running scans to finish ...")
+      self.header.addstr(0, len(TITLE) + 1, "... stopping ...", curses.A_BOLD)
+      self.header.addstr(2, 0, "waiting for the running scans to finish ...")
     else:
-      self.main.addstr(
-        line, len(TITLE) + 1,
+      self.header.addstr(
+        0, len(TITLE) + 1,
         self.render_progress(
           number_of_scans_completed_total,
           number_of_scans_total,
           length = MAIN_PROGRESS_BAR_LENGTH,
           style = 'pipe2'
-        ),
-        curses.A_BOLD
+        )
       )
-      self.main.addstr(1, 0, self.estimate_time_of_completion())
+      self.header.addstr(2, 0, self.estimate_time_of_completion())
 
-    self.main.refresh(
+    self.header.refresh(
       0, 0,
       0, 0,
       screen_height - 1, screen_width - 1
