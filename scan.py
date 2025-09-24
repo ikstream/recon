@@ -602,25 +602,6 @@ async def scan_services(target: Target):
 
   log(f"[{address}]\tstarted")
 
-  # iterate over the services found to be running on the target
-  for service in target.services:
-    transport_protocol = service.transport_protocol
-    port = service.port
-    application_protocol = service.application_protocol
-
-    # find suitable scans based on the service's transport/application protocol
-    suitable_scans = find_suitable_scans(transport_protocol, application_protocol)
-
-    # mark the service as "scanned" if at least 1 suitable scan was found; even though there is not even a scan scheduled yet
-    service.scanned = (len(suitable_scans) > 0)
-
-    # iterate over each suitable scan
-    for scan_definition in suitable_scans:
-      if scan_definition.service in ('http', 'tls'):
-        queue_service_scan_hostname(target, service, scan_definition)
-      else:
-        queue_service_scan_address(target, service, scan_definition)
-
   tasks = set()
   for scan in target.scans.values():
     if STOPPING:
@@ -978,6 +959,27 @@ async def process(stdscr, args):
   global TARGETS
   TARGETS = parse_result_files(base_directory, args.input, scan_filters)
   log(f"parsed {len(TARGETS)} targets")
+
+  # find suitable scans for each target and queue them for later.
+  # this has to be done outside any subthread/task,
+  # so that the total number of scans is know from the start.
+  for target in TARGETS.values():
+    # iterate over the services found to be running on the target
+    for service in target.services:
+      transport_protocol = service.transport_protocol
+      application_protocol = service.application_protocol
+
+      suitable_scans = find_suitable_scans(transport_protocol, application_protocol)
+
+      # mark the service as "scanned" if at least 1 suitable scan was found; even though there is not even a scan scheduled yet
+      service.scanned = (len(suitable_scans) > 0)
+
+      # iterate over each suitable scan and queue it for later
+      for scan_definition in suitable_scans:
+        if scan_definition.service in ('http', 'tls'):
+          queue_service_scan_hostname(target, service, scan_definition)
+        else:
+          queue_service_scan_address(target, service, scan_definition)
 
   # create services.csv file and initialize its header
   with open(pathlib.Path(base_directory, 'services.csv'), 'w') as f:
