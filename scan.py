@@ -313,7 +313,7 @@ def log(msg):
     method_name = inspect.stack()[1].function
     f.write(f"[{task_name}]\t[{method_name}]\t{msg}\n")
 
-def format(*args, frame_index=1, **kvargs):
+def freeze_variables(*args, frame_index=1, **kvargs):
   '''
   this function's purpose is to correctly format f-strings [1] (e.g. commands),
   defined in different frames (i.e. coroutines).
@@ -477,6 +477,7 @@ def queue_service_scan_hostname(target: Target, service: Service, scan_definitio
 
   results_directory = target.directory
 
+  # these variables are required for the scan command (i.e. `freeze_variables`)
   transport_protocol = service.transport_protocol
   port = service.port
   application_protocol = service.application_protocol
@@ -523,7 +524,7 @@ def queue_service_scan_hostname(target: Target, service: Service, scan_definitio
       hostname,
       port,
       description,
-      format(scan_definition.command)
+      freeze_variables(scan_definition.command)
     )
 
 def queue_service_scan_address(target: Target, service: Service, scan_definition: ScanDefinition):
@@ -533,6 +534,7 @@ def queue_service_scan_address(target: Target, service: Service, scan_definition
 
   results_directory = target.directory
 
+  # these variables are required for the scan command (i.e. `freeze_variables`)
   transport_protocol = service.transport_protocol
   port = service.port
   application_protocol = service.application_protocol
@@ -591,13 +593,11 @@ def queue_service_scan_address(target: Target, service: Service, scan_definition
     address,
     port,
     description,
-    format(scan_definition.command)
+    freeze_variables(scan_definition.command)
   )
   
 async def scan_services(target: Target):
 
-  # extract the target's address from the object.
-  # it's referenced like this (i.e. `{address}`) in the scan configs.
   address = target.address
 
   log(f"[{address}]\tstarted")
